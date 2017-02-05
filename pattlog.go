@@ -22,7 +22,6 @@ type formatCacheType struct {
 	longTime, longDate   string
 }
 
-var mutex sync.Mutex
 var formatCache = &formatCacheType{}
 var mutex sync.Mutex
 
