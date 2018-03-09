@@ -75,7 +75,6 @@ func NewFileLogWriter(fname string, rotate bool) *FileLogWriter {
 
 	// open the file for the first time
 	if err := w.intRotate(); err != nil {
-		fmt.Println(err)
 		fmt.Fprintf(os.Stderr, "FileLogWriter(%q): %s\n", w.filename, err)
 		return nil
 	}
