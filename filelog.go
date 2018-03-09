@@ -12,8 +12,9 @@ import (
 
 // This log writer sends output to a file
 type FileLogWriter struct {
-	rec chan *LogRecord
-	rot chan bool
+	rec  chan *LogRecord
+	rot  chan bool
+	done chan bool
 
 	// The opened file
 	filename string
@@ -49,6 +50,7 @@ func (w *FileLogWriter) LogWrite(rec *LogRecord) {
 
 func (w *FileLogWriter) Close() {
 	close(w.rec)
+	<-w.done
 }
 
 // NewFileLogWriter creates a new LogWriter which writes to the given file and
@@ -64,6 +66,7 @@ func NewFileLogWriter(fname string, rotate bool) *FileLogWriter {
 	w := &FileLogWriter{
 		rec:       make(chan *LogRecord, LogBufferLength),
 		rot:       make(chan bool),
+		done:      make(chan bool),
 		filename:  fname,
 		format:    "[%D %T] [%L] (%S) %M",
 		rotate:    rotate,
@@ -72,6 +75,7 @@ func NewFileLogWriter(fname string, rotate bool) *FileLogWriter {
 
 	// open the file for the first time
 	if err := w.intRotate(); err != nil {
+		fmt.Println(err)
 		fmt.Fprintf(os.Stderr, "FileLogWriter(%q): %s\n", w.filename, err)
 		return nil
 	}
@@ -83,6 +87,7 @@ func NewFileLogWriter(fname string, rotate bool) *FileLogWriter {
 				w.file.Sync()
 				w.file.Close()
 			}
+			close(w.done)
 		}()
 
 		for {
@@ -175,8 +180,23 @@ func (w *FileLogWriter) intRotate() error {
 		}
 	}
 
-	// Open the log file
-	fd, err := os.OpenFile(w.filename, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0660)
+	lineCount := 0
+	byteCount := 0
+
+	// If the file exists, open for reading and set our line/byte counts
+	// On failure, just assume the file doesn't exist
+	if fd, err := os.OpenFile(w.filename, os.O_RDONLY, 0440); err == nil {
+		lineCount, _ = lineCounter(fd)
+
+		fi, err := fd.Stat()
+		if err == nil {
+			byteCount = int(fi.Size())
+		}
+
+		fd.Close()
+	}
+
+	fd, err := os.OpenFile(w.filename, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0660)
 	if err != nil {
 		return err
 	}
@@ -189,15 +209,8 @@ func (w *FileLogWriter) intRotate() error {
 	w.daily_opendate = now.Day()
 
 	// initialize rotation values
-	lineCount, _ := lineCounter(w.file)
 	w.maxlines_curlines = lineCount
-
-	fi, err := w.file.Stat()
-	if err == nil {
-		w.maxsize_cursize = int(fi.Size())
-	} else {
-		w.maxsize_cursize = 0
-	}
+	w.maxsize_cursize = byteCount
 
 	return nil
 }

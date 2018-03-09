@@ -119,7 +119,6 @@ func TestFileLogWriter(t *testing.T) {
 	w.SetRotate(true)
 	w.SetRotateLines(5)
 
-	// Already has one line from write above
 	if w.maxlines_curlines != 2 {
 		t.Log(w.maxlines_curlines)
 		t.Fatal("maxlines_curlines not initialized properly")
@@ -134,9 +133,6 @@ func TestFileLogWriter(t *testing.T) {
 		w.LogWrite(newLogRecord(CRITICAL, "source", "message"))
 	}
 	defer os.Remove(testLogFile + ".1")
-
-	// Give a bit of time for the writes to finish
-	time.Sleep(time.Second * 1)
 
 	w.Close()
 	runtime.Gosched()
