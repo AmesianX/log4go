@@ -191,7 +191,13 @@ func (w *FileLogWriter) intRotate() error {
 	// initialize rotation values
 	lineCount, _ := lineCounter(w.file)
 	w.maxlines_curlines = lineCount
-	w.maxsize_cursize = lineCount
+
+	fi, err := w.file.Stat()
+	if err == nil {
+		w.maxsize_cursize = int(fi.Size())
+	} else {
+		w.maxsize_cursize = 0
+	}
 
 	return nil
 }
