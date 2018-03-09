@@ -3,7 +3,9 @@
 package log4go
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"time"
 )
@@ -174,7 +176,7 @@ func (w *FileLogWriter) intRotate() error {
 	}
 
 	// Open the log file
-	fd, err := os.OpenFile(w.filename, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0660)
+	fd, err := os.OpenFile(w.filename, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0660)
 	if err != nil {
 		return err
 	}
@@ -187,10 +189,31 @@ func (w *FileLogWriter) intRotate() error {
 	w.daily_opendate = now.Day()
 
 	// initialize rotation values
-	w.maxlines_curlines = 0
-	w.maxsize_cursize = 0
+	lineCount, _ := lineCounter(w.file)
+	w.maxlines_curlines = lineCount
+	w.maxsize_cursize = lineCount
 
 	return nil
+}
+
+// Taken from https://stackoverflow.com/a/24563853
+func lineCounter(r io.Reader) (int, error) {
+	buf := make([]byte, 32*1024)
+	count := 0
+	lineSep := []byte{'\n'}
+
+	for {
+		c, err := r.Read(buf)
+		count += bytes.Count(buf[:c], lineSep)
+
+		switch {
+		case err == io.EOF:
+			return count, nil
+
+		case err != nil:
+			return count, err
+		}
+	}
 }
 
 // Set the logging format (chainable).  Must be called before the first log
